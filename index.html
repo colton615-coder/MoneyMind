@@ -542,6 +542,106 @@ window.onerror = function (msg, src, line, col) {
 window.addEventListener('load', ()=>{
   if (typeof renderAll === 'function') renderAll();
 });
+</script><script>
+/* ====== PennyPilot click-fix patch (safe to append) ====== */
+(function(){
+  // simple toast
+  function toast(msg, ok=true){
+    const d=document.createElement('div');
+    d.style.cssText='position:fixed;left:12px;right:12px;bottom:84px;z-index:9999;padding:12px 14px;border-radius:12px;font:14px system-ui';
+    d.style.background = ok ? '#0d2a1e' : '#2a1414';
+    d.style.border = '1px solid ' + (ok ? '#1f8b66' : '#8b1f1f');
+    d.style.color = ok ? '#a7f3d0' : '#feb2b2';
+    d.textContent = msg;
+    document.body.appendChild(d); setTimeout(()=>d.remove(), 2500);
+  }
+  const $ = id => document.getElementById(id);
+
+  // Ensure type=button and wire handler (prevents silent form submits)
+  function wire(id, fn){
+    const el = $(id); if(!el) return;
+    el.setAttribute('type','button');
+    el.onclick = (e)=>{ e.preventDefault(); try{ fn(); } catch(err){ console.error(err); toast(err.message,false); } };
+  }
+
+  // Guard: if global data not present, create minimal defaults
+  window.cats ||= [];
+  window.txs  ||= [];
+  window.saveCats ||= function(){ localStorage.setItem('pp_cats_v4', JSON.stringify(cats)); };
+  window.saveTxs  ||= function(){ localStorage.setItem('pp_txs_v4',  JSON.stringify(txs));  };
+
+  // Rebuild category dropdown safely
+  function refreshSelect(){
+    if (!$('#category')) return;
+    const opts=[];
+    (cats||[]).forEach(c=>{
+      (c.children||[]).forEach(s=>opts.push(`${c.name} / ${s.name}`));
+      opts.push(c.name);
+    });
+    $('#category').innerHTML = opts.map(o=>`<option>${o}</option>`).join('');
+  }
+
+  // ==== Save Expense
+  wire('saveTx', function(){
+    const amt = parseFloat(($('#amount')?.value||'').replace(',','.'));
+    if(!(amt>0)) return toast('Enter a positive amount', false);
+    const sel = $('#category')?.value || '';
+    const [parent, child] = sel.split(' / ').map(s=>s?.trim());
+    const date = $('#date')?.value || new Date().toISOString().slice(0,10);
+    const note = $('#note')?.value?.trim() || '';
+    txs.push({id: (crypto.randomUUID?.()||String(Date.now())), amt:+amt.toFixed(2), cat:parent||'Uncategorized', sub:child||'', date, note});
+    saveTxs(); toast('Expense saved ✅');
+    if ($('#amount')) $('#amount').value=''; if ($('#note')) $('#note').value='';
+    if (typeof renderAll==='function') renderAll();
+  });
+
+  // ==== Clear form
+  wire('wipeTx', function(){
+    if ($('#amount')) $('#amount').value='';
+    if ($('#note'))   $('#note').value='';
+    toast('Cleared');
+  });
+
+  // ==== Add / Update Category
+  wire('addOrUpdate', function(){
+    const name = ($('#newCat')?.value||'').trim();
+    const b    = parseFloat(($('#newBudget')?.value||'').replace(',','.'));
+    if(!name || isNaN(b) || b<0) return toast('Enter category & non-negative budget', false);
+    const i = (cats||[]).findIndex(c=>c.name.toLowerCase()===name.toLowerCase());
+    if(i>=0) cats[i].budget = +b.toFixed(2);
+    else cats.push({name, budget:+b.toFixed(2), children:[]});
+    saveCats(); refreshSelect(); toast('Category saved ✔️');
+    if ($('#newCat')) $('#newCat').value=''; if ($('#newBudget')) $('#newBudget').value='';
+    if (typeof renderAll==='function') renderAll();
+  });
+
+  // ==== Add / Update Subcategory
+  wire('addSub', function(){
+    const parent = ($('#parentName')?.value||'').trim();
+    const name   = ($('#subName')?.value||'').trim();
+    const b      = parseFloat(($('#subBudget')?.value||'').replace(',','.'));
+    if(!parent || !name || isNaN(b) || b<0) return toast('Parent, subcategory, budget required', false);
+    const c = (cats||[]).find(x=>x.name.toLowerCase()===parent.toLowerCase());
+    if(!c) return toast('Parent category not found', false);
+    const j = (c.children||[]).findIndex(s=>s.name.toLowerCase()===name.toLowerCase());
+    if(j>=0) c.children[j].budget = +b.toFixed(2); else (c.children||(c.children=[])).push({name, budget:+b.toFixed(2)});
+    saveCats(); refreshSelect(); toast('Subcategory saved ✔️');
+    if ($('#parentName')) $('#parentName').value='';
+    if ($('#subName'))    $('#subName').value='';
+    if ($('#subBudget'))  $('#subBudget').value='';
+    if (typeof renderAll==='function') renderAll();
+  });
+
+  // Rebind month filter (in case earlier script failed before wiring)
+  if ($('#filterMonth')) {
+    $('#filterMonth').value = (new Date()).toISOString().slice(0,7);
+    $('#filterMonth').onchange = ()=> typeof renderAll==='function' && renderAll();
+  }
+
+  // If the main script crashed before, give it a nudge now
+  refreshSelect();
+  if (typeof renderAll==='function') renderAll();
+})();
 </script>
 </body>
 </html>
