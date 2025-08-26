@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>PennyPilot — Pro Fintech UI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0B1020" />
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256' viewBox='0 0 256 256'%3E%3Crect width='256' height='256' rx='56' fill='%2310162A'/%3E%3Ctext x='50%25' y='54%25' text-anchor='middle' dominant-baseline='middle' font-family='Inter,Arial' font-weight='700' font-size='120' fill='%2334d399'%3E%24%3C/text%3E%3C/svg%3E" />
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='512' height='512' viewBox='0 0 256 256'%3E%3Crect width='256' height='256' rx='56' fill='%2310162A'/%3E%3Ctext x='50%25' y='54%25' text-anchor='middle' dominant-baseline='middle' font-family='Inter,Arial' font-weight='700' font-size='120' fill='%2334d399'%3E%24%3C/text%3E%3C/svg%3E" />
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0B1020; --card:#0F1B36; --ink:#E6EAF3; --sub:#9AA6C7; --muted:#1D2A4C;
+    --accent:#34D399; --accent2:#60A5FA; --warn:#F59E0B; --danger:#EF4444;
+    --shadow:0 12px 36px rgba(0,0,0,.35); --radius:18px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:
+    radial-gradient(1200px 800px at 85% -10%, #13234b, #0b1020 55%) fixed,
+    radial-gradient(900px 600px at -10% 110%, #0c1b3e, transparent 70%) fixed;
+    color:var(--ink);font:16px/1.45 Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;padding-bottom:92px}
+  header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,#0b1327,#0b132700);backdrop-filter:blur(8px);padding:16px;text-align:center}
+  header h1{margin:0;font-size:20px;font-weight:900;color:var(--accent)}
+  main{max-width:1120px;margin:0 auto;padding:16px;display:grid;gap:16px;grid-template-columns:1fr}
+  @media(min-width:960px){main{grid-template-columns:1.15fr .85fr}}
+  section{background:linear-gradient(180deg,#0f1b36ee,#0c1730ee);border:1px solid #17264a;border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+  h2{margin:0 0 12px;font-size:18px}
+  label{display:block;font-size:13px;color:var(--sub);margin-bottom:6px}
+  input,select{width:100%;padding:12px 14px;border-radius:12px;border:1px solid #1b2c54;background:#0b1730;color:var(--ink)}
+  .row{display:flex;flex-wrap:wrap;gap:12px}
+  .money{font-size:28px;font-weight:900}
+  .ring{--pct:0;width:92px;height:92px;border-radius:50%;background:conic-gradient(#34d399 calc(var(--pct)*1%), #1f2a48 0);
+    display:grid;place-items:center;box-shadow:inset 0 0 0 10px #0a1426,0 8px 24px rgba(0,0,0,.25)}
+  .ring>span{font-weight:900}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:10px 8px;border-bottom:1px solid #18264a;font-size:14px;text-align:left;vertical-align:middle}
+  th{color:#99aadd}
+  .pill{padding:4px 8px;border-radius:999px;border:1px solid #2a3b5d;font-size:12px}
+  .ok{color:#34d399;border-color:#1e8d6c}.warnP{color:#f59e0b;border-color:#9a6a0d}.over{color:#ef4444;border-color:#a32020}
+  .subrow td{background:linear-gradient(180deg,#0a1429,#0a1326)}
+  .indent{padding-left:28px}
+  .edit-btn{padding:6px 10px;border-radius:8px;border:1px solid #2a3b5d;background:#132447;color:#dbe5ff}
+  .badge{padding:2px 6px;border-radius:6px;background:#132447;border:1px solid #253a68;color:#cfe1ff;font-size:11px}
+  nav{position:fixed;left:0;right:0;bottom:0;background:rgba(11,19,39,.75);backdrop-filter:blur(10px);border-top:1px solid #17264a;display:grid;grid-template-columns:repeat(4,1fr)}
+  nav button{background:none;border:0;color:#b7c4e0;padding:10px 6px;font-size:12px}
+  nav button[aria-current="page"]{color:#34d399;font-weight:900;text-shadow:0 0 12px rgba(52,211,153,.45)}
+</style>
+</head>
+<body>
+<header><h1>PennyPilot</h1></header>
+<main>  <!-- Home -->
+  <section id="home">
+    <h2>Today</h2>
+    <div class="row">
+      <div style="flex:1 1 200px">
+        <label class="sub">Spent today</label><div class="money" id="kpiToday">$0.00</div>
+      </div>
+      <div style="flex:1 1 200px">
+        <label class="sub">This month</label><div class="money" id="kpiMonth">$0.00</div>
+      </div>
+      <div style="flex:1 1 200px">
+        <label class="sub">Under / Over</label><div class="money" id="kpiDelta">$0.00</div>
+      </div>
+    </div>
+    <div class="row" style="align-items:center;margin-top:12px">
+      <div class="ring"><span id="ringPct">0%</span></div>
+      <div><div class="badge">Offline • Local only</div></div>
+    </div>
+    <canvas id="trend" height="180" style="margin-top:10px"></canvas>
+  </section>
+
+  <!-- Log -->
+  <section id="log" style="display:none">
+    <h2>Log Expense</h2>
+    <div class="row">
+      <div style="flex:1 1 140px"><label>Amount</label><input id="amount" inputmode="decimal" placeholder="12.50"></div>
+      <div style="flex:1 1 220px"><label>Category / Subcategory</label><select id="category"></select></div>
+      <div style="flex:1 1 160px"><label>Date</label><input id="date" type="date"></div>
+    </div>
+    <div class="row"><div style="flex:1 1 100%"><label>Note</label><input id="note" placeholder="optional note"></div></div>
+    <div class="row"><button class="edit-btn" id="saveTx">Save Expense</button><button class="edit-btn" id="wipeTx">Clear</button></div>
+  </section>
+
+  <!-- Budgets -->
+  <section id="budgets" style="display:none">
+    <div class="row" style="align-items:center"><h2 style="margin-right:auto">Budgets</h2><span class="badge">Tap ✎ to edit</span></div>
+    <table id="budgetTable">
+      <thead><tr><th>Category</th><th>Budget</th><th>Spent</th><th>%</th><th>Status</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <h3 style="margin:12px 0 6px">Add / Update Category</h3>
+    <div class="row">
+      <input id="newCat" placeholder="Category (emoji welcome)" style="flex:2 1 220px">
+      <input id="newBudget" inputmode="decimal" placeholder="Budget" style="flex:1 1 140px">
+      <button class="edit-btn" id="addOrUpdate">Save Budget</button>
+    </div>
+
+    <h3 style="margin:12px 0 6px">Add / Update Subcategory</h3>
+    <div class="row">
+      <input id="parentName" placeholder="Parent category" style="flex:2 1 220px">
+      <input id="subName" placeholder="Subcategory" style="flex:2 1 220px">
+      <input id="subBudget" inputmode="decimal" placeholder="Budget" style="flex:1 1 140px">
+      <button class="edit-btn" id="addSub">Save Subcategory</button>
+    </div>
+
+    <div class="row" style="margin-top:10px">
+      <button class="edit-btn" id="resetToStarter">Reset Starter Set</button>
+      <button class="edit-btn" id="wipeAll">Erase ALL Local Data</button>
+    </div>
+  </section>
+
+  <!-- Reports -->
+  <section id="reports" style="display:none">
+    <h2>Reports</h2>
+    <div class="row" style="align-items:end">
+      <div><label>Month</label><input type="month" id="filterMonth"></div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="edit-btn" id="exportJson">Export JSON</button>
+        <button class="edit-btn" id="importJsonBtn">Import JSON</button>
+        <input id="importJson" type="file" accept="application/json" style="display:none">
+      </div>
+    </div>
+    <canvas id="donut" height="220" style="margin-top:10px"></canvas>
+    <h3 style="margin:12px 0 6px">Transactions (month)</h3>
+    <table id="txTable">
+      <thead><tr><th>Date</th><th>Category</th><th>Amount</th><th>Note</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+</main>
+
+<nav>
+  <button data-view="home" aria-current="page">Home</button>
+  <button data-view="log">Log</button>
+  <button data-view="budgets">Budgets</button>
+  <button data-view="reports">Reports</button>
+</nav><script>
+/* ===== Data (with subcategories) ===== */
+const LS_CATS='pp_cats_v4'; // [{name,budget,children:[{name,budget}]}]
+const LS_TX='pp_txs_v4';    // [{id,date,cat,sub,amt,note}]
+
+const starter = [
+  {name:"Groceries 🍎", budget:300, children:[{name:"Produce",budget:120},{name:"Snacks",budget:60},{name:"Household",budget:120}]},
+  {name:"Dining 🍽",    budget:150, children:[{name:"Coffee",budget:30},{name:"Takeout",budget:120}]},
+  {name:"Transport 🚗", budget:120, children:[{name:"Fuel",budget:80},{name:"Transit",budget:40}]},
+  {name:"Housing 🏠",   budget:800, children:[{name:"Rent/Mortgage",budget:800}]},
+  {name:"Utilities 💡", budget:100, children:[{name:"Power",budget:60},{name:"Water",budget:20},{name:"Gas",budget:20}]},
+  {name:"Bills 🧾",     budget:0,   children:[{name:"Insurance",budget:120},{name:"Phone",budget:60},{name:"Subscriptions",budget:40}]},
+  {name:"Health 🏥",    budget:60, children:[]},
+  {name:"Entertainment 🎮", budget:80, children:[{name:"Streaming",budget:30}]},
+  {name:"Misc 💸",      budget:90, children:[]}
+];
+
+let cats = JSON.parse(localStorage.getItem(LS_CATS) || 'null');
+if(!cats){ cats = starter; localStorage.setItem(LS_CATS, JSON.stringify(cats)); }
+let txs  = JSON.parse(localStorage.getItem(LS_TX) || '[]');
+
+/* ===== Utils ===== */
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const money = n => "$" + Number(n||0).toFixed(2);
+const today = () => new Date().toISOString().slice(0,10);
+const mkey  = d => (d||today()).slice(0,7);
+function saveCats(){ localStorage.setItem(LS_CATS, JSON.stringify(cats)); }
+function saveTxs(){ localStorage.setItem(LS_TX, JSON.stringify(txs)); }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+
+/* ===== Category select (Parent and Parent/Sub) ===== */
+function refreshCategorySelect(){
+  const opts=[];
+  cats.forEach(c=>{
+    if(c.children?.length){ c.children.forEach(s=>opts.push(`${c.name} / ${s.name}`)); }
+    opts.push(c.name);
+  });
+  $('#category').innerHTML = opts.map(o=>`<option>${o}</option>`).join('');
+}
+$('#date').value = today();
+refreshCategorySelect();
+
+/* ===== Navigation ===== */
+$$('nav button').forEach(b=>{
+  b.onclick = ()=>{
+    const v=b.dataset.view;
+    $$('nav button').forEach(x=>x.setAttribute('aria-current', x===b?'page':'false'));
+    $$('main > section').forEach(s=> s.style.display = (s.id===v) ? 'block' : 'none');
+    if(['home','budgets','reports'].includes(v)) renderAll();
+    scrollTo({top:0,behavior:'smooth'});
+  };
+});
+$$('main > section').forEach((s,i)=> s.style.display = i? 'none':'block');
+
+/* ===== Inline editor ===== */
+function makeEditable(td, onSave){
+  const val = td.dataset.value ?? td.textContent.replace(/[^0-9.]/g,'');
+  td.innerHTML = `
+    <input class="inline-edit" style="width:120px;padding:6px 8px;border-radius:8px;border:1px solid #2a3b5d;background:#0b1730;color:#e5e7eb" inputmode="decimal" value="${val}">
+    <button class="edit-btn" data-ok>Save</button>
+    <button class="edit-btn" data-cancel>Cancel</button>
+  `;
+  td.querySelector('[data-ok]').onclick = ()=>{
+    const n = parseFloat(td.querySelector('.inline-edit').value.replace(',','.'));
+    if(isNaN(n)||n<0){ alert('Enter a non-negative number'); return; }
+    onSave(+n.toFixed(2));
+  };
+  td.querySelector('[data-cancel]').onclick = ()=> renderBudgets(); // revert
+}
+
+/* ===== Math helpers ===== */
+function monthSpendMap(monthKey){
+  const map = {};
+  txs.filter(t=>mkey(t.date)===monthKey).forEach(t=>{
+    const key = t.sub ? `${t.cat}::${t.sub}` : t.cat;
+    map[key] = (map[key]||0) + t.amt;
+  });
+  return map;
+}
+function computeRollups(monthKey){
+  const spend = monthSpendMap(monthKey);
+  return cats.map(cat=>{
+    const own = spend[cat.name]||0;
+    const childs = (cat.children||[]).map(sc=>{
+      const s = spend[`${cat.name}::${sc.name}`]||0;
+      return {name:sc.name, budget:sc.budget||0, spent:s};
+    });
+    const sumBud = childs.reduce((a,s)=>a+s.budget,0);
+    const sumSp  = childs.reduce((a,s)=>a+s.spent,0);
+    return {
+      cat, catSpentOwn:own, childStats:childs,
+      totalBudget:(cat.budget||0)+sumBud,
+      totalSpent:own+sumSp
+    };
+  });
+}/* ===== Budgets render + handlers ===== */
+let donutChart, trendChart;
+
+function renderBudgets(){
+  const tbody = $('#budgetTable tbody');
+  const mk = $('#filterMonth').value || mkey(today());
+  const rows = computeRollups(mk);
+
+  tbody.innerHTML = rows.map(r=>{
+    const pct = r.totalBudget>0 ? (r.totalSpent/r.totalBudget) : 0;
+    const pctTxt = r.totalBudget>0 ? Math.round(pct*100)+'%' : '—';
+    const status = r.totalBudget===0 ? 'No budget' : (pct<0.75?'OK':(pct<=1?'Warning':'Over'));
+    const pill = status==='OK'?'ok':(status==='Warning'?'warnP':'over');
+
+    const children = r.childStats.map(sc=>{
+      const cPct = sc.budget>0 ? sc.spent/sc.budget : 0;
+      const cPctTxt = sc.budget>0 ? Math.round(cPct*100)+'%' : '—';
+      const cStatus = sc.budget===0 ? 'No budget' : (cPct<0.75?'OK':(cPct<=1?'Warning':'Over'));
+      const cPill = cStatus==='OK
