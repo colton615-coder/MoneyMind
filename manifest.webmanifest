@@ -1,0 +1,9 @@
+{
+  "name": "PennyPilot",
+  "short_name": "PennyPilot",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#1f2937",
+  "icons":[{"src":"icon.png","sizes":"512x512","type":"image/png"}]
+}
