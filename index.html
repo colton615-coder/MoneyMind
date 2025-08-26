@@ -251,3 +251,211 @@ function renderBudgets(){
       const cPctTxt = sc.budget>0 ? Math.round(cPct*100)+'%' : '—';
       const cStatus = sc.budget===0 ? 'No budget' : (cPct<0.75?'OK':(cPct<=1?'Warning':'Over'));
       const cPill = cStatus==='OK
+                const cPill = cStatus==='OK' ? 'ok' : (cStatus==='Warning' ? 'warnP' : 'over');
+        return `<tr class="subrow">
+          <td class="indent"><span class="sub">↳</span> ${sc.name}</td>
+          <td data-type="subBudget" data-cat="${r.cat.name}" data-sub="${sc.name}" data-value="${sc.budget}">
+            ${money(sc.budget)} <button class="edit-btn" data-edit>✎</button>
+          </td>
+          <td>${money(sc.spent)}</td>
+          <td>${cPctTxt}</td>
+          <td><span class="pill ${cPill}">${cStatus}</span></td>
+          <td><button class="edit-btn" data-del-sub="${r.cat.name}::${sc.name}">Delete</button></td>
+        </tr>`;
+      }).join('');
+
+    return `
+      <tr>
+        <td><strong>${r.cat.name}</strong></td>
+        <td data-type="catBudget" data-cat="${r.cat.name}" data-value="${r.cat.budget||0}">
+          ${money(r.cat.budget||0)} <button class="edit-btn" data-edit>✎</button>
+        </td>
+        <td>${money(r.totalSpent)}</td>
+        <td>${pctTxt}</td>
+        <td><span class="pill ${pill}">${status}</span></td>
+        <td><button class="edit-btn" data-del="${r.cat.name}">Delete</button></td>
+      </tr>
+      ${children}
+    `;
+  }).join('');
+
+  // Inline editors
+  $$('[data-edit]').forEach(btn=>{
+    btn.onclick = (e)=>{
+      const td = e.target.closest('td');
+      makeEditable(td, (num)=>{
+        if(td.dataset.type==='catBudget'){
+          const c = cats.find(x=>x.name===td.dataset.cat); if(!c) return;
+          c.budget = num;
+        }else{
+          const c = cats.find(x=>x.name===td.dataset.cat); if(!c) return;
+          const s = c.children.find(y=>y.name===td.dataset.sub); if(!s) return;
+          s.budget = num;
+        }
+        saveCats(); renderBudgets();
+      });
+    };
+  });
+
+  // Deletes
+  $$('[data-del]').forEach(b=> b.onclick = ()=>{
+    const name = b.getAttribute('data-del');
+    if(!confirm(`Delete category "${name}"? Transactions remain.`)) return;
+    cats = cats.filter(c=>c.name!==name); saveCats(); refreshCategorySelect(); renderAll();
+  });
+  $$('[data-del-sub]').forEach(b=> b.onclick = ()=>{
+    const [pc,sc] = b.getAttribute('data-del-sub').split('::');
+    const c = cats.find(x=>x.name===pc); if(!c) return;
+    c.children = c.children.filter(s=>s.name!==sc);
+    saveCats(); refreshCategorySelect(); renderAll();
+  });
+
+  // KPIs + ring
+  const totals = rows.reduce((a,r)=>({budget:a.budget+r.totalBudget, spent:a.spent+r.totalSpent}),{budget:0,spent:0});
+  $('#kpiMonth').textContent = money(totals.spent);
+  const delta = totals.budget - totals.spent;
+  $('#kpiDelta').textContent = (delta>=0?'+':'-') + money(Math.abs(delta));
+  const pct = totals.budget>0 ? Math.min(1, totals.spent/totals.budget) : 0;
+  document.querySelector('.ring').style.setProperty('--pct', (pct*100).toFixed(1));
+  $('#ringPct').textContent = `${Math.round(pct*100)}%`;
+}
+
+/* ===== Transactions table ===== */
+function renderTxTable(){
+  const tbody = document.querySelector('#txTable tbody');
+  const mk = document.querySelector('#filterMonth')?.value || mkey(today());
+  const list = txs.filter(t=>mkey(t.date)===mk).sort((a,b)=>a.date<b.date?1:-1);
+  tbody.innerHTML = list.map(t=>`
+    <tr>
+      <td>${t.date}</td>
+      <td>${t.cat}${t.sub? ' / '+t.sub:''}</td>
+      <td>${money(t.amt)}</td>
+      <td>${escapeHtml(t.note||'')}</td>
+      <td><button class="edit-btn" data-rm="${t.id}">Delete</button></td>
+    </tr>
+  `).join('');
+  $$('[data-rm]').forEach(b=> b.onclick = ()=>{
+    const id=b.getAttribute('data-rm');
+    txs = txs.filter(x=>x.id!==id);
+    saveTxs(); renderAll();
+  });
+}
+
+/* ===== Charts ===== */
+function renderCharts(){
+  const mk = document.querySelector('#filterMonth')?.value || mkey(today());
+  const rows = computeRollups(mk);
+
+  // Donut uses subs if present, else parent
+  const labels = rows.flatMap(r=>{
+    const subs = (r.childStats||[]).map(s=>`${r.cat.name} / ${s.name}`);
+    return subs.length ? subs : [r.cat.name];
+  });
+  const values = rows.flatMap(r=>{
+    const subs = (r.childStats||[]).map(s=>s.spent);
+    return subs.length ? subs : [r.totalSpent];
+  });
+
+  donutChart && donutChart.destroy();
+  donutChart = new Chart(document.getElementById('donut'), {
+    type:'doughnut',
+    data:{ labels, datasets:[{ data: values,
+      backgroundColor:['#34d399','#60a5fa','#f59e0b','#f472b6','#a78bfa','#f87171','#22d3ee','#fb7185','#4ade80','#facc15'] }] },
+    options:{ plugins:{ legend:{ position:'bottom', labels:{ color:'#e5e7eb' } } } }
+  });
+
+  const months = [...new Set(txs.map(t=>mkey(t.date)))].sort();
+  const totals = months.map(m=> txs.filter(t=>mkey(t.date)===m).reduce((a,b)=>a+b.amt,0));
+  trendChart && trendChart.destroy();
+  trendChart = new Chart(document.getElementById('trend'), {
+    type:'line',
+    data:{ labels: months, datasets:[{ data: totals, borderColor:'#34d399', backgroundColor:'#10b98133', tension:.25, fill:true }]},
+    options:{ plugins:{ legend:{display:false}}, scales:{ x:{ ticks:{ color:'#9ca3af'}}, y:{ ticks:{ color:'#9ca3af'}}}}
+  });
+}
+
+/* ===== KPI: today ===== */
+function renderKpisToday(){
+  const t = txs.filter(x=>x.date===today()).reduce((a,b)=>a+b.amt,0);
+  document.getElementById('kpiToday').textContent = money(t);
+}
+
+/* ===== Log actions ===== */
+document.getElementById('saveTx').onclick = ()=>{
+  const amt = parseFloat(document.getElementById('amount').value.replace(',','.'));
+  const sel = document.getElementById('category').value; // "Parent / Sub" or "Parent"
+  const [parent, child] = sel.split(' / ').map(s=>s.trim());
+  const date = document.getElementById('date').value || today();
+  const note = document.getElementById('note').value.trim();
+  if(!(amt>0)) return alert('Enter a positive amount');
+
+  txs.push({id:crypto.randomUUID(), amt:+amt.toFixed(2), cat:parent, sub:(child||''), date, note});
+  saveTxs();
+  document.getElementById('amount').value=''; document.getElementById('note').value='';
+  renderAll(); alert('Saved ✅');
+};
+document.getElementById('wipeTx').onclick = ()=>{
+  document.getElementById('amount').value=''; document.getElementById('note').value='';
+};
+
+/* ===== Add / Update Category & Sub ===== */
+document.getElementById('addOrUpdate').onclick = ()=>{
+  const name = document.getElementById('newCat').value.trim();
+  const b = parseFloat(document.getElementById('newBudget').value.replace(',','.'));
+  if(!name || isNaN(b) || b<0) return alert('Enter a category and a non-negative budget');
+  const i = cats.findIndex(c=>c.name.toLowerCase()===name.toLowerCase());
+  if(i>=0) cats[i].budget = +b.toFixed(2);
+  else cats.push({name, budget:+b.toFixed(2), children:[]});
+  saveCats(); document.getElementById('newCat').value=''; document.getElementById('newBudget').value='';
+  refreshCategorySelect(); renderAll();
+};
+document.getElementById('addSub').onclick = ()=>{
+  const parent = document.getElementById('parentName').value.trim();
+  const name = document.getElementById('subName').value.trim();
+  const b = parseFloat(document.getElementById('subBudget').value.replace(',','.'));
+  if(!parent || !name || isNaN(b) || b<0) return alert('Parent, subcategory, budget required');
+  const c = cats.find(x=>x.name.toLowerCase()===parent.toLowerCase());
+  if(!c) return alert('Parent category not found');
+  const j = c.children.findIndex(s=>s.name.toLowerCase()===name.toLowerCase());
+  if(j>=0) c.children[j].budget = +b.toFixed(2); else c.children.push({name, budget:+b.toFixed(2)});
+  saveCats(); document.getElementById('parentName').value=''; document.getElementById('subName').value=''; document.getElementById('subBudget').value='';
+  refreshCategorySelect(); renderAll();
+};
+
+/* ===== Resets & Import/Export ===== */
+document.getElementById('resetToStarter').onclick = ()=>{
+  if(!confirm('Reset categories to starter set? Transactions remain.')) return;
+  cats = JSON.parse(JSON.stringify(starter)); saveCats(); refreshCategorySelect(); renderAll();
+};
+document.getElementById('wipeAll').onclick = ()=>{
+  if(!confirm('Erase ALL local data?')) return;
+  localStorage.removeItem(LS_CATS); localStorage.removeItem(LS_TX);
+  cats = JSON.parse(JSON.stringify(starter)); txs = []; saveCats(); saveTxs(); refreshCategorySelect(); renderAll();
+};
+document.getElementById('exportJson').onclick = ()=>{
+  const blob = new Blob([JSON.stringify({cats,txs},null,2)], {type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`pennypilot-backup-${Date.now()}.json`; a.click(); a.remove();
+};
+document.getElementById('importJsonBtn').onclick = ()=> document.getElementById('importJson').click();
+document.getElementById('importJson').onchange = async (e)=>{
+  const f=e.target.files[0]; if(!f) return;
+  try{
+    const obj = JSON.parse(await f.text());
+    if(!Array.isArray(obj.cats) || !Array.isArray(obj.txs)) throw 0;
+    cats=obj.cats; txs=obj.txs; saveCats(); saveTxs(); refreshCategorySelect(); renderAll(); alert('Imported ✅');
+  }catch{ alert('Invalid backup file'); }
+};
+
+/* ===== Month filter + initial render ===== */
+document.getElementById('filterMonth').value = mkey(today());
+document.getElementById('filterMonth').onchange = ()=> renderAll();
+
+function renderAll(){ renderBudgets(); renderTxTable(); renderCharts(); renderKpisToday(); }
+refreshCategorySelect(); renderAll();
+
+/* ===== Service Worker (offline) ===== */
+if('serviceWorker' in navigator){ addEventListener('load', ()=>navigator.serviceWorker.register('./sw.js')); }
+</script>
+</body>
+</html>
