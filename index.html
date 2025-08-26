@@ -456,6 +456,92 @@ refreshCategorySelect(); renderAll();
 
 /* ===== Service Worker (offline) ===== */
 if('serviceWorker' in navigator){ addEventListener('load', ()=>navigator.serviceWorker.register('./sw.js')); }
+</script><script>
+/* ---------- PennyPilot Safe Boot Patch ---------- */
+// 1) Surface any hidden JS error so we know immediately if something else breaks
+window.onerror = function (msg, src, line, col) {
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;left:8px;right:8px;bottom:84px;z-index:9999;background:#1b273f;color:#ffb4b4;border:1px solid #7a1a1a;padding:10px;border-radius:10px;font:13px/1.4 system-ui';
+  box.textContent = 'JS Error: ' + msg + ' @ ' + (src||'inline') + ':' + line + ':' + col;
+  document.body.appendChild(box);
+  setTimeout(()=>box.remove(), 8000);
+};
+
+// 2) Make renderAll tolerant if Chart.js isn't ready yet
+(function patchRenderAll(){
+  if (typeof renderAll === 'function') {
+    const _renderAll = renderAll;
+    window.renderAll = function(){
+      try{
+        // run everything except charts
+        if (typeof renderBudgets === 'function') renderBudgets();
+        if (typeof renderTxTable === 'function') renderTxTable();
+        if (typeof renderKpisToday === 'function') renderKpisToday();
+
+        // render charts only when Chart is present
+        if (window.Chart && typeof renderCharts === 'function') {
+          renderCharts();
+        } else {
+          window.addEventListener('load', () => {
+            if (window.Chart && typeof renderCharts === 'function') renderCharts();
+          }, {once:true});
+        }
+      }catch(e){ console.error(e); }
+    };
+  }
+})();
+
+// 3) Re-wire critical buttons & nav in case earlier code bailed out
+(function ensureHandlers(){
+  // Nav
+  const navBtns = document.querySelectorAll('nav button[data-view]');
+  const sections = document.querySelectorAll('main > section');
+  if (navBtns.length && sections.length) {
+    navBtns.forEach(b=>{
+      if (b._wired) return; b._wired = true;
+      b.addEventListener('click', ()=>{
+        const v=b.dataset.view;
+        navBtns.forEach(x=>x.setAttribute('aria-current', x===b?'page':'false'));
+        sections.forEach(s=> s.style.display = (s.id===v)?'block':'none');
+        if (typeof renderAll === 'function' && (v==='home'||v==='budgets'||v==='reports')) renderAll();
+        scrollTo({top:0,behavior:'smooth'});
+      }, {passive:true});
+    });
+  }
+
+  // Save / Clear
+  const save = document.getElementById('saveTx');
+  const wipe = document.getElementById('wipeTx');
+  if (save && !save._wired) {
+    save._wired = true;
+    save.addEventListener('click', ()=>{
+      if (typeof window.saveTx === 'function') return window.saveTx();
+      // minimal fallback (shouldn't be needed)
+      const amt = parseFloat((document.getElementById('amount').value||'').replace(',','.'));
+      if (!(amt>0)) return alert('Enter a positive amount');
+      const sel = document.getElementById('category').value||'';
+      const [cat, sub] = sel.split(' / ').map(s=>s?.trim());
+      const date = document.getElementById('date').value || new Date().toISOString().slice(0,10);
+      const note = document.getElementById('note').value||'';
+      const txs = JSON.parse(localStorage.getItem('pp_txs_v4')||'[]');
+      txs.push({id:crypto.randomUUID?.()||String(Date.now()), amt:+amt.toFixed(2), cat:cat||'Uncategorized', sub:sub||'', date, note});
+      localStorage.setItem('pp_txs_v4', JSON.stringify(txs));
+      alert('Saved ✅'); location.reload();
+    });
+  }
+  if (wipe && !wipe._wired) {
+    wipe._wired = true;
+    wipe.addEventListener('click', ()=>{
+      const a=document.getElementById('amount'); if(a) a.value='';
+      const n=document.getElementById('note'); if(n) n.value='';
+    });
+  }
+})();
+
+// 4) Kick a fresh render once everything (including Chart.js) is ready
+window.addEventListener('load', ()=>{
+  if (typeof renderAll === 'function') renderAll();
+});
 </script>
 </body>
 </html>
