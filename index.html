@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>PennyPilot — Budget & Expense Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1f2937" />
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256' viewBox='0 0 256 256'%3E%3Crect width='256' height='256' rx='56' fill='%231F2937'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='SF Pro,Arial' font-size='120' fill='%23A7F3D0'%3E%24%3C/text%3E%3C/svg%3E" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+  <!-- Chart.js for graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+
+  <style>
+    body{margin:0;font:16px system-ui,sans-serif;background:#0b1220;color:#e5e7eb;padding-bottom:80px}
+    header{padding:16px;background:#111827;color:#34d399;text-align:center;font-size:20px;font-weight:700}
+    main{padding:16px;max-width:900px;margin:auto}
+    section{background:#111827;margin:12px 0;padding:16px;border-radius:12px}
+    label{display:block;margin:6px 0;font-size:13px;color:#9ca3af}
+    input,select{width:100%;padding:10px;border-radius:8px;border:1px solid #1f2937;background:#0f172a;color:#e5e7eb}
+    button{margin-top:10px;padding:10px 14px;border:none;border-radius:8px;background:#34d399;color:#062016;font-weight:700}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;border-bottom:1px solid #1f2937;text-align:left}
+    nav{position:fixed;bottom:0;left:0;right:0;background:#111827;display:flex;justify-content:space-around;padding:8px}
+    nav button{flex:1;background:none;color:#9ca3af;border:none;font-size:14px}
+    nav button.active{color:#34d399;font-weight:700}
+  </style>
+</head>
+<body>
+<header>PennyPilot</header>
+<main>  <section id="home">
+    <h2>Today</h2>
+    <p id="todaySpend">$0.00</p>
+    <canvas id="trend" height="150"></canvas>
+  </section>
+
+  <section id="log">
+    <h2>Log Expense</h2>
+    <label>Amount</label>
+    <input id="amount" inputmode="decimal" placeholder="e.g., 12.50">
+    <label>Category</label>
+    <select id="category"></select>
+    <label>Date</label>
+    <input id="date" type="date">
+    <label>Note</label>
+    <input id="note" placeholder="optional note">
+    <button onclick="saveTx()">Save</button>
+  </section>
+
+  <section id="budgets">
+    <h2>Budgets</h2>
+    <table id="budgetTable">
+      <thead><tr><th>Category</th><th>Budget</th><th>Spent</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section id="reports">
+    <h2>Reports</h2>
+    <canvas id="donut" height="200"></canvas>
+    <table id="txTable">
+      <thead><tr><th>Date</th><th>Category</th><th>Amount</th><th>Note</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+</main>
+
+<nav>
+  <button onclick="showView('home')" class="active">Home</button>
+  <button onclick="showView('log')">Log</button>
+  <button onclick="showView('budgets')">Budgets</button>
+  <button onclick="showView('reports')">Reports</button>
+</nav><script>
+const cats = JSON.parse(localStorage.getItem('cats')||'["Groceries","Dining","Transport","Misc"]');
+const txs = JSON.parse(localStorage.getItem('txs')||'[]');
+document.getElementById('category').innerHTML = cats.map(c=>`<option>${c}</option>`).join('');
+document.getElementById('date').value = new Date().toISOString().split('T')[0];
+
+function saveTx(){
+  const amt = parseFloat(document.getElementById('amount').value||0);
+  const cat = document.getElementById('category').value;
+  const date = document.getElementById('date').value;
+  const note = document.getElementById('note').value;
+  if(amt<=0) return alert("Enter valid amount");
+  txs.push({amt,cat,date,note});
+  localStorage.setItem('txs',JSON.stringify(txs));
+  render(); alert("Saved!");
+}
+
+function render(){
+  const tbody = document.querySelector("#txTable tbody");
+  tbody.innerHTML = txs.map(t=>`<tr><td>${t.date}</td><td>${t.cat}</td><td>$${t.amt.toFixed(2)}</td><td>${t.note||""}</td></tr>`).join('');
+  // Budgets
+  const spentByCat={}; cats.forEach(c=>spentByCat[c]=0);
+  txs.forEach(t=>spentByCat[t.cat]+=t.amt);
+  const btbody=document.querySelector("#budgetTable tbody");
+  btbody.innerHTML=cats.map(c=>`<tr><td>${c}</td><td>$100</td><td>$${spentByCat[c].toFixed(2)}</td></tr>`).join('');
+  // Today
+  const today = new Date().toISOString().split('T')[0];
+  const todaySpend=txs.filter(t=>t.date===today).reduce((a,b)=>a+b.amt,0);
+  document.getElementById("todaySpend").innerText="$"+todaySpend.toFixed(2);
+  // Charts
+  new Chart(document.getElementById('donut'), {
+    type:'doughnut',
+    data:{labels:cats, datasets:[{data:cats.map(c=>spentByCat[c])}]},
+    options:{plugins:{legend:{labels:{color:"#e5e7eb"}}}}
+  });
+  const months=[...new Set(txs.map(t=>t.date.slice(0,7)))];
+  const totals=months.map(m=>txs.filter(t=>t.date.startsWith(m)).reduce((a,b)=>a+b.amt,0));
+  new Chart(document.getElementById('trend'), {
+    type:'line',
+    data:{labels:months,datasets:[{data:totals,borderColor:"#34d399"}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#9ca3af"}},y:{ticks:{color:"#9ca3af"}}}}
+  });
+}
+
+function showView(id){
+  document.querySelectorAll("main section").forEach(s=>s.style.display=s.id===id?"block":"none");
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.textContent===id.charAt(0).toUpperCase()+id.slice(1)));
+}
+render();
+</script>
+</body>
+</html>
