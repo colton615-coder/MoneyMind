@@ -1,0 +1,16 @@
+{
+  "name": "PennyPilot",
+  "short_name": "PennyPilot",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#1f2937",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512' viewBox='0 0 256 256'><rect width='256' height='256' rx='56' fill='%231F2937'/><text x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='120' fill='%23A7F3D0'>$</text><text x='50%25' y='78%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='28' fill='white'>PennyPilot</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
