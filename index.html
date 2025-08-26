@@ -642,6 +642,119 @@ window.addEventListener('load', ()=>{
   refreshSelect();
   if (typeof renderAll==='function') renderAll();
 })();
+</script><script>
+/* ====== Robust Save handlers patch (append-only) ====== */
+(function(){
+  const $ = (id) => document.getElementById(id);
+  const debug = (msg) => {
+    const d=document.createElement('div');
+    d.style.cssText='position:fixed;left:12px;right:12px;bottom:84px;z-index:9999;padding:10px 12px;border-radius:10px;background:#1b273f;color:#cde1ff;border:1px solid #2c3f6a;font:13px system-ui';
+    d.textContent = msg; document.body.appendChild(d); setTimeout(()=>d.remove(), 3000);
+  };
+  const toast = (msg, ok=true) => {
+    const d=document.createElement('div');
+    d.style.cssText='position:fixed;left:12px;right:12px;bottom:48px;z-index:9999;padding:12px 14px;border-radius:12px;font:14px system-ui';
+    d.style.background = ok ? '#0d2a1e' : '#2a1414';
+    d.style.border = '1px solid ' + (ok ? '#1f8b66' : '#8b1f1f');
+    d.style.color = ok ? '#a7f3d0' : '#feb2b2';
+    d.textContent = msg; document.body.appendChild(d); setTimeout(()=>d.remove(), 2600);
+  };
+  const normNum = (v) => {
+    // strip everything except digits, dot, minus
+    const clean = String(v ?? '').replace(/[^\d.\-]/g,'');
+    return clean === '' ? NaN : Number(clean);
+  };
+
+  // Rebind Add / Update Category with stronger parsing
+  const catBtn = $('addOrUpdate');
+  if (catBtn) {
+    catBtn.type = 'button';
+    catBtn.onclick = () => {
+      try{
+        const name = ($('newCat')?.value || '').trim();
+        const bRaw = $('newBudget')?.value ?? '';
+        const b = normNum(bRaw);
+        if (!name || isNaN(b) || b < 0) {
+          debug(`name="${name}"  budgetRaw="${bRaw}"  parsed=${b}`);
+          return toast('Enter category & non-negative budget', false);
+        }
+        // ensure globals exist
+        if (typeof cats === 'undefined') window.cats = [];
+        if (!Array.isArray(cats)) window.cats = [];
+        if (typeof saveCats !== 'function') window.saveCats = ()=>localStorage.setItem('pp_cats_v4', JSON.stringify(cats));
+
+        const i = cats.findIndex(c=>c.name.toLowerCase()===name.toLowerCase());
+        if (i >= 0) cats[i].budget = +b.toFixed(2);
+        else cats.push({name, budget:+b.toFixed(2), children:[]});
+        saveCats();
+        if (typeof refreshCategorySelect === 'function') refreshCategorySelect();
+        if ($('newCat')) $('newCat').value = '';
+        if ($('newBudget')) $('newBudget').value = '';
+        if (typeof renderAll === 'function') renderAll();
+        toast('Category saved ✔️');
+      }catch(e){ console.error(e); toast(e.message, false); }
+    };
+  }
+
+  // Rebind Add / Update Subcategory
+  const subBtn = $('addSub');
+  if (subBtn) {
+    subBtn.type = 'button';
+    subBtn.onclick = () => {
+      try{
+        const parent = ($('parentName')?.value || '').trim();
+        const name   = ($('subName')?.value || '').trim();
+        const bRaw   = $('subBudget')?.value ?? '';
+        const b = normNum(bRaw);
+        if (!parent || !name || isNaN(b) || b < 0) {
+          debug(`parent="${parent}"  sub="${name}"  budgetRaw="${bRaw}" parsed=${b}`);
+          return toast('Parent, subcategory & non-negative budget required', false);
+        }
+        if (!Array.isArray(cats)) window.cats = [];
+        const c = cats.find(x=>x.name.toLowerCase()===parent.toLowerCase());
+        if (!c) return toast('Parent category not found', false);
+        c.children ||= [];
+        const j = c.children.findIndex(s=>s.name.toLowerCase()===name.toLowerCase());
+        if (j >= 0) c.children[j].budget = +b.toFixed(2);
+        else c.children.push({name, budget:+b.toFixed(2)});
+        saveCats();
+        if (typeof refreshCategorySelect === 'function') refreshCategorySelect();
+        if ($('parentName')) $('parentName').value='';
+        if ($('subName')) $('subName').value='';
+        if ($('subBudget')) $('subBudget').value='';
+        if (typeof renderAll === 'function') renderAll();
+        toast('Subcategory saved ✔️');
+      }catch(e){ console.error(e); toast(e.message, false); }
+    };
+  }
+
+  // Make "Tap ✎ to edit" possible by ensuring rows exist after first save
+  // (once a category is saved, render adds edit buttons)
+  // Also wire Save Expense if needed
+  const saveTxBtn = $('saveTx');
+  if (saveTxBtn && !saveTxBtn._wired) {
+    saveTxBtn._wired = true;
+    saveTxBtn.type = 'button';
+    saveTxBtn.onclick = () => {
+      const amt = normNum($('amount')?.value);
+      if (!(amt > 0)) return toast('Enter a positive amount', false);
+      const sel = $('category')?.value || '';
+      const [parent, child] = sel.split(' / ').map(s=>s?.trim());
+      const date = $('date')?.value || new Date().toISOString().slice(0,10);
+      const note = $('note')?.value?.trim() || '';
+      try{
+        if (!Array.isArray(window.txs)) window.txs = [];
+        if (typeof saveTxs !== 'function') window.saveTxs = ()=>localStorage.setItem('pp_txs_v4', JSON.stringify(txs));
+        txs.push({id: crypto.randomUUID?.() || String(Date.now()), amt:+amt.toFixed(2), cat:parent||'Uncategorized', sub:child||'', date, note});
+        saveTxs();
+        if ($('amount')) $('amount').value='';
+        if ($('note')) $('note').value='';
+        if (typeof renderAll === 'function') renderAll();
+        toast('Expense saved ✅');
+      }catch(e){ console.error(e); toast(e.message, false); }
+    };
+  }
+})();
 </script>
 </body>
 </html>
